@@ -26,4 +26,5 @@ library
                        bytestring >= 0.10.2.0,
                        network >= 2.4,
                        text >= 0.7,
+                       attoparsec,
                        waisp

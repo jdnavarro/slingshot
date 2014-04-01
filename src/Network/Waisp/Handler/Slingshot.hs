@@ -2,7 +2,7 @@ module Network.Waisp.Handler.Slingshot where
 
 import Network.Waisp (Application)
 
-run :: Port -> Application -> IO r
-run = undefined
+serve :: Port -> Application -> IO r
+serve = undefined
 
 type Port = Int

@@ -3,7 +3,7 @@ module Network.Waisp.Handler.Slingshot.Request where
 
 import Control.Applicative -- ((<$), (<$>), (<*>), (<|>))
 import Data.Word (Word8)
-import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import Data.Attoparsec.Char8
   -- (Parser, stringCI)
 import Network.Waisp
@@ -12,6 +12,10 @@ import Network.Waisp
   -- , RequestHeaders
   -- , Host
   -- )
+
+-- $setup
+-- >>> :set -XOverloadedStrings
+-- >>> import Data.ByteString.Char8
 
 -- * Attoparsec
 
@@ -23,13 +27,31 @@ requestMessageHeaderParser =
 
 -- ** Request Line
 
+{-|
+
+    >>> let bs = "GET /docs/index.html?query=value HTTP/1.1\r\n" :: ByteString
+    >>> parseTest requestLineParser bs
+    Done "" RequestLine GET "/docs/index.html" "query=value" (HttpVersion 1 1)
+
+    >>> let bs' = "GET /docs/index.html HTTP/1.1\r\n" :: ByteString
+    >>> parseTest requestLineParser bs'
+    Done "" RequestLine GET "/docs/index.html" "" (HttpVersion 1 1)
+-}
 requestLineParser :: Parser RequestLine
 requestLineParser =
-    RequestLine <$> methodParser <* char8 ' '
+    RequestLine <$> methodParser
+                <*  char ' '
                 <*> pathInfoParser
-                <*> try queryParser
+                <*> (try queryParser <|> pure B.empty)
+                <*  char ' '
                 <*> httpVersionParser
+                <*  string "\r\n"
+{-|
 
+>>> let bs = "GET /docs/index.html" :: ByteString
+>>> parseTest methodParser bs
+Done " /docs/index.html" GET
+-}
 methodParser :: Parser Method
 methodParser = GET     <$ stringCI "get"
            <|> PUT     <$ stringCI "put"
@@ -40,12 +62,36 @@ methodParser = GET     <$ stringCI "get"
            <|> CONNECT <$ stringCI "connect"
            <|> OPTIONS <$ stringCI "options"
 
+{-| 'PathInfo' parser.
+
+    It stops parsing after a /space/ or a @?@
+
+    >>> let bs = "/docs/index.html?query=value" :: ByteString
+    >>> parseTest pathInfoParser bs
+    Done "?query=value" "/docs/index.html"
+-}
 pathInfoParser :: Parser PathInfo
-pathInfoParser = takeWhile1 (\c -> c /= ' ' || c /= '?')
+pathInfoParser = takeWhile1 (\c -> c /= ' ' && c /= '?')
 
+{-| 'Query' parser.
+
+    The query string is expected to start with @?@.
+
+    >>> let bs = "?query=value HTTP/1.1" :: ByteString
+    >>> parseTest queryParser bs
+    Done " HTTP/1.1" "query=value"
+-}
 queryParser :: Parser Query
-queryParser = char '?' *> takeWhile1 isSpace
+queryParser = char '?' *> takeWhile1 (/= ' ')
 
+{-| 'HttpVersion' parser.
+
+    The trailing @CRLF@ is not consumed.
+
+    >>> let bs = "HTTP/1.1\r\n" :: ByteString
+    >>> parseTest httpVersionParser bs
+    Done "\r\n" HttpVersion 1 1
+-}
 httpVersionParser :: Parser HttpVersion
 httpVersionParser = HttpVersion
                 <$  stringCI "http/"

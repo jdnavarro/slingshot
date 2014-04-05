@@ -7,10 +7,9 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Map as Map
-import Data.Attoparsec (takeTill)
+import Data.Attoparsec (satisfy, skipWhile, takeTill)
 import Data.Attoparsec.Char8
   ( Parser
-  , string
   , stringCI
   , decimal
   , try
@@ -19,6 +18,7 @@ import Data.Attoparsec.Char8
   , skipSpace
   , isEndOfLine
   , endOfLine
+  , isHorizontalSpace
   )
 import Network.Waisp
   -- ( RequestMessageHeader(..)
@@ -55,12 +55,12 @@ requestMessageHeaderParser =
 requestLineParser :: Parser RequestLine
 requestLineParser =
     RequestLine <$> methodParser
-                <*  char ' '
+                <*  skipSpaces
                 <*> pathInfoParser
                 <*> (try queryParser <|> pure B.empty)
-                <*  char ' '
+                <*  skipSpaces
                 <*> httpVersionParser
-                <*  crlf
+                <*  endOfLine
 {-|
 
 >>> let bs = "GET /docs/index.html" :: ByteString
@@ -97,7 +97,7 @@ pathInfoParser = takeWhile1 (\c -> c /= ' ' && c /= '?')
     Done " HTTP/1.1" "query=value"
 -}
 queryParser :: Parser Query
-queryParser = char '?' *> takeWhile1 (/= ' ')
+queryParser = char '?' *> takeTill isHorizontalSpace
 
 {-| 'HttpVersion' parser.
 
@@ -117,14 +117,14 @@ httpVersionParser = HttpVersion
 -- * Headers
 
 hostParser :: Parser Host
-hostParser = stringCI "host:" *> skipSpace *> takeWhile1 (/= '\r') <* crlf
+hostParser = stringCI "host:" *> skipSpace *> takeTill isEndOfLine <* endOfLine
 
 requestHeadersParser :: Parser RequestHeaders
 requestHeadersParser = RequestHeaders
     <$> headersGeneralParser
     <*> headersRequestParser
     <*> headersCustomParser
-    <*  crlf
+    <*  endOfLine
 
 headersGeneralParser :: Parser (Headers HeaderGeneral)
 headersGeneralParser = Map.fromList <$> many headerGeneralParser
@@ -150,5 +150,5 @@ headersCustomParser = undefined
 showBS :: Show a => a -> ByteString
 showBS = B8.pack . show
 
-crlf :: Parser ByteString
-crlf =  string "\r\n"
+skipSpaces :: Parser ()
+skipSpaces = satisfy isHorizontalSpace *> skipWhile isHorizontalSpace

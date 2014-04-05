@@ -2,10 +2,24 @@
 module Network.Waisp.Handler.Slingshot.Request where
 
 import Control.Applicative -- ((<$), (<$>), (<*>), (<|>))
-import Data.Word (Word8)
+import Data.Foldable (asum)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.Map as Map
+import Data.Attoparsec (takeTill)
 import Data.Attoparsec.Char8
-  -- (Parser, stringCI)
+  ( Parser
+  , string
+  , stringCI
+  , decimal
+  , try
+  , char
+  , takeWhile1
+  , skipSpace
+  , isEndOfLine
+  , endOfLine
+  )
 import Network.Waisp
   -- ( RequestMessageHeader(..)
   -- , RequestLine
@@ -16,6 +30,7 @@ import Network.Waisp
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import Data.ByteString.Char8
+-- >>> import Data.Attoparsec (parseTest)
 
 -- * Attoparsec
 
@@ -45,7 +60,7 @@ requestLineParser =
                 <*> (try queryParser <|> pure B.empty)
                 <*  char ' '
                 <*> httpVersionParser
-                <*  string "\r\n"
+                <*  crlf
 {-|
 
 >>> let bs = "GET /docs/index.html" :: ByteString
@@ -102,15 +117,38 @@ httpVersionParser = HttpVersion
 -- * Headers
 
 hostParser :: Parser Host
-hostParser = undefined
+hostParser = stringCI "host:" *> skipSpace *> takeWhile1 (/= '\r') <* crlf
 
 requestHeadersParser :: Parser RequestHeaders
-requestHeadersParser = undefined
+requestHeadersParser = RequestHeaders
+    <$> headersGeneralParser
+    <*> headersRequestParser
+    <*> headersCustomParser
+    <*  crlf
+
+headersGeneralParser :: Parser (Headers HeaderGeneral)
+headersGeneralParser = Map.fromList <$> many headerGeneralParser
+
+headerGeneralParser :: Parser (HeaderGeneral, ByteString)
+headerGeneralParser = asum $ mkHeaderParser <$> enumFrom CacheControl
+
+mkHeaderParser :: HeaderGeneral -> Parser (HeaderGeneral, ByteString)
+mkHeaderParser h = stringCI (showBS h)
+                *> char ':'
+                *> skipSpaces
+                *> do bs <- takeTill isEndOfLine <* endOfLine
+                      return (h, bs)
+
+headersRequestParser :: Parser (Headers HeaderRequest)
+headersRequestParser = undefined
+
+headersCustomParser :: Parser (Headers HeaderCustom)
+headersCustomParser = undefined
 
 -- * Common helpers
 
-crlf :: Parser Word8
-crlf = undefined
+showBS :: Show a => a -> ByteString
+showBS = B8.pack . show
 
--- isToken :: Word8 -> Bool
--- isToken w = w <= 127 && notInClass "\0-\31()<>@,;:\\\"/[]?={} \t" w
+crlf :: Parser ByteString
+crlf =  string "\r\n"

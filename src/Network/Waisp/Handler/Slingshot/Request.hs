@@ -122,19 +122,19 @@ requestHeadersParser = RequestHeaders
     <*  endOfLine
 
 headersGeneralParser :: Parser (Headers HeaderGeneral)
-headersGeneralParser = Map.fromList <$> many headerGeneralParser
+headersGeneralParser = headersParser headerGeneralParser
 
 headerGeneralParser :: Parser (HeaderGeneral, ByteString)
-headerGeneralParser = asum $ mkHeaderParser <$> enumAll
+headerGeneralParser = headerParser
 
 headersRequestParser :: Parser (Headers HeaderRequest)
-headersRequestParser = Map.fromList <$> many headerRequestParser
+headersRequestParser = headersParser headerRequestParser
 
 headerRequestParser :: Parser (HeaderRequest, ByteString)
-headerRequestParser = asum $ mkHeaderParser <$> enumAll
+headerRequestParser = headerParser
 
 headersCustomParser :: Parser (Headers HeaderCustom)
-headersCustomParser = Map.fromList <$> many headerCustomParser
+headersCustomParser = headersParser headerCustomParser
 
 headerCustomParser :: Parser (HeaderCustom, ByteString)
 headerCustomParser = do
@@ -142,14 +142,22 @@ headerCustomParser = do
     value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
     return (field, value)
 
--- * Common helpers
+-- ** Header helpers
 
-mkHeaderParser :: Show header => header -> Parser (header, ByteString)
+headersParser :: (Show h, Ord h) => Parser (h, ByteString) -> Parser (Headers h)
+headersParser = fmap Map.fromList . many
+
+headerParser :: (Show h, Enum h) => Parser (h, ByteString)
+headerParser = asum $ mkHeaderParser <$> enumAll
+
+mkHeaderParser :: Show h => h -> Parser (h, ByteString)
 mkHeaderParser h = stringCI (showBS h)
                 *> char ':'
                 *> skipSpaces
                 *> do bs <- takeTill isEndOfLine <* endOfLine
                       return (h, bs)
+
+-- * Common helpers
 
 showBS :: Show a => a -> ByteString
 showBS = B8.pack . show

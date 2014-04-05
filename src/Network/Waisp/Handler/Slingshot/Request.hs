@@ -127,13 +127,6 @@ headersGeneralParser = Map.fromList <$> many headerGeneralParser
 headerGeneralParser :: Parser (HeaderGeneral, ByteString)
 headerGeneralParser = asum $ mkHeaderParser <$> enumFrom CacheControl
 
-mkHeaderParser :: HeaderGeneral -> Parser (HeaderGeneral, ByteString)
-mkHeaderParser h = stringCI (showBS h)
-                *> char ':'
-                *> skipSpaces
-                *> do bs <- takeTill isEndOfLine <* endOfLine
-                      return (h, bs)
-
 headersRequestParser :: Parser (Headers HeaderRequest)
 headersRequestParser = undefined
 
@@ -141,6 +134,13 @@ headersCustomParser :: Parser (Headers HeaderCustom)
 headersCustomParser = undefined
 
 -- * Common helpers
+
+mkHeaderParser :: Show header => header -> Parser (header, ByteString)
+mkHeaderParser h = stringCI (showBS h)
+                *> char ':'
+                *> skipSpaces
+                *> do bs <- takeTill isEndOfLine <* endOfLine
+                      return (h, bs)
 
 showBS :: Show a => a -> ByteString
 showBS = B8.pack . show

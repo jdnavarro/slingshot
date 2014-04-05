@@ -68,14 +68,9 @@ requestLineParser =
 Done " /docs/index.html" GET
 -}
 methodParser :: Parser Method
-methodParser = GET     <$ stringCI "get"
-           <|> PUT     <$ stringCI "put"
-           <|> POST    <$ stringCI "post"
-           <|> HEAD    <$ stringCI "head"
-           <|> DELETE  <$ stringCI "delete"
-           <|> TRACE   <$ stringCI "trace"
-           <|> CONNECT <$ stringCI "connect"
-           <|> OPTIONS <$ stringCI "options"
+methodParser = asum $ meth <$> enumFrom OPTIONS
+  where
+    meth met = met <$ stringCI (showBS met)
 
 {-| 'PathInfo' parser.
 

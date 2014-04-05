@@ -68,7 +68,7 @@ requestLineParser =
 Done " /docs/index.html" GET
 -}
 methodParser :: Parser Method
-methodParser = asum $ meth <$> enumFrom OPTIONS
+methodParser = asum $ meth <$> enumAll
   where
     meth met = met <$ stringCI (showBS met)
 
@@ -125,13 +125,22 @@ headersGeneralParser :: Parser (Headers HeaderGeneral)
 headersGeneralParser = Map.fromList <$> many headerGeneralParser
 
 headerGeneralParser :: Parser (HeaderGeneral, ByteString)
-headerGeneralParser = asum $ mkHeaderParser <$> enumFrom CacheControl
+headerGeneralParser = asum $ mkHeaderParser <$> enumAll
 
 headersRequestParser :: Parser (Headers HeaderRequest)
-headersRequestParser = undefined
+headersRequestParser = Map.fromList <$> many headerRequestParser
+
+headerRequestParser :: Parser (HeaderRequest, ByteString)
+headerRequestParser = asum $ mkHeaderParser <$> enumAll
 
 headersCustomParser :: Parser (Headers HeaderCustom)
-headersCustomParser = undefined
+headersCustomParser = Map.fromList <$> many headerCustomParser
+
+headerCustomParser :: Parser (HeaderCustom, ByteString)
+headerCustomParser = do
+    field <- takeWhile1 (/= ':')
+    value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
+    return (field, value)
 
 -- * Common helpers
 
@@ -147,3 +156,6 @@ showBS = B8.pack . show
 
 skipSpaces :: Parser ()
 skipSpaces = satisfy isHorizontalSpace *> skipWhile isHorizontalSpace
+
+enumAll :: Enum a => [a]
+enumAll = enumFrom $ toEnum 0

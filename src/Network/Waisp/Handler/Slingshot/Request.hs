@@ -112,14 +112,16 @@ httpVersionParser = HttpVersion
 -- * Headers
 
 hostParser :: Parser Host
-hostParser = stringCI "host:" *> skipSpace *> takeTill isEndOfLine <* endOfLine
+hostParser = stringCI "host:"
+          *> skipSpace
+          *> takeTill isEndOfLine
+          <* endOfLine
 
 requestHeadersParser :: Parser RequestHeaders
-requestHeadersParser = RequestHeaders
-    <$> headersGeneralParser
-    <*> headersRequestParser
-    <*> headersCustomParser
-    <*  endOfLine
+requestHeadersParser = RequestHeaders <$> headersGeneralParser
+                                      <*> headersRequestParser
+                                      <*> headersCustomParser
+                                      <*  endOfLine
 
 headersGeneralParser :: Parser (Headers HeaderGeneral)
 headersGeneralParser = headersParser headerGeneralParser
@@ -144,7 +146,9 @@ headerCustomParser = do
 
 -- ** Header helpers
 
-headersParser :: (Show h, Ord h) => Parser (h, ByteString) -> Parser (Headers h)
+headersParser :: (Show h, Ord h)
+              => Parser (h, ByteString)
+              -> Parser (Headers h)
 headersParser = fmap Map.fromList . many
 
 headerParser :: (Show h, Enum h) => Parser (h, ByteString)

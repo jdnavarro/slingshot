@@ -1,7 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Waisp.Handler.Slingshot.Request where
 
-import Control.Applicative -- ((<$), (<$>), (<*>), (<|>))
+import Control.Applicative
+  ( (<$)
+  , (<$>)
+  , (<*)
+  , (*>)
+  , (<*>)
+  , (<|>)
+  , pure
+  , many
+  )
 import Data.Foldable (asum)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -30,7 +39,7 @@ import Network.Waisp
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import Data.ByteString.Char8
--- >>> import Data.Attoparsec (parseTest)
+-- >>> import Data.Attoparsec (parseTest, parseOnly)
 
 -- * Attoparsec
 
@@ -111,36 +120,91 @@ httpVersionParser = HttpVersion
 
 -- * Headers
 
+{-| Host header parser.
+
+    >>> let bs = "Host: www.example.com\r\n" :: ByteString
+    >>> parseTest hostParser bs
+    Done "" "www.example.com"
+-}
 hostParser :: Parser Host
 hostParser = stringCI "host:"
           *> skipSpace
           *> takeTill isEndOfLine
           <* endOfLine
 
+{-| Parser for all headers of a 'Request'.
+
+    >>> -- let bs = "Connection: close\r\nAccept: */*\r\n\r\n :: ByteString
+    >>> -- parseTest requestHeadersParser bs
+-}
 requestHeadersParser :: Parser RequestHeaders
+-- XXX: Support unordered headers
 requestHeadersParser = RequestHeaders <$> headersGeneralParser
                                       <*> headersRequestParser
                                       <*> headersCustomParser
                                       <*  endOfLine
 
+{-| Parse general headers of a 'Request'.
+
+    >>> let bs = "Connection: close\r\nDate: Sun, 18 Oct 2009 08:56:53 GMT\r\nAccept-Language: en-us\r\n" :: ByteString
+    >>> parseTest headersGeneralParser bs
+    Done "Accept-Language: en-us\r\n" fromList [(Connection,"close"),(Date,"Sun, 18 Oct 2009 08:56:53 GMT")]
+
+    >>> let bs' = "Connection: close\r\nAccept-Language\r\n" :: ByteString
+    >>> parseTest headersGeneralParser bs'
+    Done "Accept-Language\r\n" fromList [(Connection,"close")]
+-}
 headersGeneralParser :: Parser (Headers HeaderGeneral)
 headersGeneralParser = headersParser headerGeneralParser
 
+{-| Parse a single general header.
+
+    >>> let bs = "Connection: close\r\n" :: ByteString
+    >>> parseTest headerGeneralParser bs
+    Done "" (Connection,"close")
+    >>> let bs' = "Date: Sun, 18 Oct 2009 08:56:53 GMT\r\n" :: ByteString
+    >>> parseTest headerGeneralParser bs'
+    Done "" (Date,"Sun, 18 Oct 2009 08:56:53 GMT")
+-}
 headerGeneralParser :: Parser (HeaderGeneral, ByteString)
 headerGeneralParser = headerParser
 
+{-| Parse the specific headers of a 'Request'.
+
+    >>> let bs = "Accept: */*\r\nAccept-Language: en-us\r\nConnection: close\r\n" :: ByteString
+    >>> parseTest headersRequestParser bs
+    Done "Connection: close\r\n" fromList [(Accept,"*/*"),(Accept-Language,"en-us")]
+-}
 headersRequestParser :: Parser (Headers HeaderRequest)
 headersRequestParser = headersParser headerRequestParser
 
+{-| Parse a single specific header of a 'Request'.
+
+    >>> let bs = "Accept: */*\r\n" :: ByteString
+    >>> parseTest headerRequestParser bs
+    Done "" (Accept,"*/*")
+-}
 headerRequestParser :: Parser (HeaderRequest, ByteString)
 headerRequestParser = headerParser
 
+{-| Parse custom headers of a 'Request'.
+
+    >>> let bs = "SomeHeader: SomeValue\r\nAnotherHeader: AnotherValue\r\n" :: ByteString
+    >>> parseOnly headersCustomParser bs
+    Right (fromList [("AnotherHeader","AnotherValue"),("SomeHeader","SomeValue")])
+-}
 headersCustomParser :: Parser (Headers HeaderCustom)
 headersCustomParser = headersParser headerCustomParser
 
+{-| Parse a single custom header of a 'Request'.
+
+    >>> let bs = "SomeHeader: SomeValue\r\n" :: ByteString
+    >>> parseTest headerCustomParser bs
+    Done "" ("SomeHeader","SomeValue")
+-}
 headerCustomParser :: Parser (HeaderCustom, ByteString)
 headerCustomParser = do
-    field <- takeWhile1 (/= ':')
+    field <- takeWhile1 (/= ':') <* char ':'
     value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
     return (field, value)
 

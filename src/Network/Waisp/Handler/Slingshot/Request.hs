@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Waisp.Handler.Slingshot.Request where
+module Network.Waisp.Handler.Slingshot.Request
+  ( requestMessageHeaderParser
+  ) where
 
 import Control.Applicative
   ( (<$)

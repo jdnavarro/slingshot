@@ -1,19 +1,25 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Waisp.Handler.Slingshot where
 
+import Control.Applicative ((*>))
 import Control.Monad (void, forever)
+import Data.Monoid ((<>))
+import Data.Foldable (foldMap)
 import Data.ByteString (ByteString)
+import qualified Data.Map as Map (toList)
 import Network.Socket (Socket, close)
 import Control.Monad.Trans.State.Strict (runStateT)
 
 import Control.Monad.Catch (bracket)
-import Pipes (Producer, (>->), runEffect)
+import Pipes ((>->), runEffect, yield)
 import Pipes.Network.TCP (acceptFork, fromSocket, toSocket)
 import Pipes.Attoparsec (parse)
 
-import Network.Waisp (Application(..), Request(..), Response(..))
+import Network.Waisp (Application(..), Request(..), Response(..), ResponseHeaders(..), Body)
 import Network.Waisp.Handler.Slingshot.Settings
 import Network.Waisp.Handler.Slingshot.Request
 import Network.Waisp.Handler.Slingshot.Network
+import Network.Waisp.Handler.Slingshot.Utils
 
 type Port = Int
 
@@ -45,10 +51,16 @@ recvRequest sock = do
                           Right h -> return . Just $ Request h body
 
 sendResponse :: Socket -> Response -> IO ()
-sendResponse sock res = runEffect $ serialize res >-> toSocket sock
+sendResponse sock res =
+    runEffect $ (yield (responseMessageHeader res) *> responseBody res) >-> toSocket sock
 
-class Serializable a where
-    serialize :: Monad m => a -> Producer ByteString m r
+responseMessageHeader :: Response -> ByteString
+responseMessageHeader (Response statusline headers _) =
+    showBS statusline <> showHeaders headers
+  where
+    showHeaders (ResponseHeaders h0 h1 h2) = format h0 <> format h1 <> format h2 <> "\r\n"
+    format m = foldMap format' $ Map.toList m
+    format' (h,f) = showBS h <> ": " <> showBS f <> "\r\n"
 
-instance Serializable Response where
-    serialize = undefined
+responseBody :: Response -> Body
+responseBody (Response _ _ body) = body

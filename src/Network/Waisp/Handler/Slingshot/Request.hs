@@ -16,7 +16,6 @@ import Control.Applicative
 import Data.Foldable (asum)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
 import qualified Data.Map as Map
 import Data.Attoparsec (satisfy, skipWhile, takeTill)
 import Data.Attoparsec.Char8
@@ -37,6 +36,7 @@ import Network.Waisp
   -- , RequestHeaders
   -- , Host
   -- )
+import Network.Waisp.Handler.Slingshot.Utils
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -228,9 +228,6 @@ mkHeaderParser h = stringCI (showBS h)
                       return (h, bs)
 
 -- * Common helpers
-
-showBS :: Show a => a -> ByteString
-showBS = B8.pack . show
 
 skipSpaces :: Parser ()
 skipSpaces = satisfy isHorizontalSpace *> skipWhile isHorizontalSpace

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Waisp.Handler.Slingshot.Settings where
 
 import Network.Waisp.Handler.Slingshot.Network
@@ -8,4 +9,4 @@ data Settings = Settings
   }
 
 defaultSettings :: Settings
-defaultSettings = undefined
+defaultSettings = Settings 1234 "*"

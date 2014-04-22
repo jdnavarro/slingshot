@@ -143,7 +143,8 @@ requestHeadersParser :: Parser RequestHeaders
 -- XXX: Support unordered headers
 requestHeadersParser = RequestHeaders <$> headersGeneralParser
                                       <*> headersRequestParser
-                                      <*> headersCustomParser
+                                      <*> headersEntityParser
+                                      <*> headersExtensionParser
                                       <*  endOfLine
 
 {-| Parse general headers of a 'Request'.
@@ -189,23 +190,41 @@ headersRequestParser = headersParser headerRequestParser
 headerRequestParser :: Parser (HeaderRequest, ByteString)
 headerRequestParser = headerParser
 
-{-| Parse custom headers of a 'Request'.
+{-| Parse entity headers of a 'Request'.
+
+    >>> let bs = "Content-Type: text/plain\r\nAnotherHeader: AnotherValue\r\n" :: ByteString
+    >>> parseTest headersEntityParser bs
+    Done "AnotherHeader: AnotherValue\r\n" fromList [(Content-Type,"text/plain")]
+-}
+headersEntityParser :: Parser (Headers HeaderEntity)
+headersEntityParser = headersParser headerEntityParser
+
+{-| Parse a single entity header of a 'Request'.
+
+    >>> let bs = "Content-Type: text/plain\r\n" :: ByteString
+    >>> parseTest headerEntityParser bs
+    Done "" (Content-Type,"text/plain")
+-}
+headerEntityParser :: Parser (HeaderEntity, ByteString)
+headerEntityParser =  headerParser
+
+{-| Parse extension headers of a 'Request'.
 
     >>> let bs = "SomeHeader: SomeValue\r\nAnotherHeader: AnotherValue\r\n" :: ByteString
-    >>> parseOnly headersCustomParser bs
+    >>> parseOnly headersExtensionParser bs
     Right (fromList [("AnotherHeader","AnotherValue"),("SomeHeader","SomeValue")])
 -}
-headersCustomParser :: Parser (Headers HeaderCustom)
-headersCustomParser = headersParser headerCustomParser
+headersExtensionParser :: Parser (Headers HeaderExtension)
+headersExtensionParser = headersParser headerExtensionParser
 
-{-| Parse a single custom header of a 'Request'.
+{-| Parse a extension header of a 'Request'.
 
     >>> let bs = "SomeHeader: SomeValue\r\n" :: ByteString
-    >>> parseTest headerCustomParser bs
+    >>> parseTest headerExtensionParser bs
     Done "" ("SomeHeader","SomeValue")
 -}
-headerCustomParser :: Parser (HeaderCustom, ByteString)
-headerCustomParser = do
+headerExtensionParser :: Parser (HeaderExtension, ByteString)
+headerExtensionParser = do
     field <- takeWhile1 (/= ':') <* char ':'
     value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
     return (field, value)

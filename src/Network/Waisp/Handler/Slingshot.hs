@@ -58,7 +58,7 @@ responseMessageHeader :: Response -> ByteString
 responseMessageHeader (Response statusline headers _) =
     showBS statusline <> showHeaders headers
   where
-    showHeaders (ResponseHeaders h0 h1 h2) = format h0 <> format h1 <> format h2 <> "\r\n"
+    showHeaders (ResponseHeaders h0 h1 h2 h3) = format h0 <> format h1 <> format h2 <> format h3 <> "\r\n"
     format m = foldMap format' $ Map.toList m
     format' (h,f) = showBS h <> ": " <> showBS f <> "\r\n"
 

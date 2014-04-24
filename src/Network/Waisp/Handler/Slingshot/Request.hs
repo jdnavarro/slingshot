@@ -12,12 +12,13 @@ import Control.Applicative
   , (<|>)
   , pure
   , many
+  , empty
   )
 import Data.Foldable (asum)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.Map as Map
-import Data.Attoparsec (satisfy, skipWhile, takeTill)
+import Data.Attoparsec (satisfy, skipWhile, takeTill, peekWord8')
 import Data.Attoparsec.Char8
   ( Parser
   , stringCI
@@ -137,8 +138,8 @@ hostParser = stringCI "host:"
 {-| Parser for all headers of a 'Request'.
 
     >>> let bs = "Connection: close\r\nAccept: */*\r\n\r\n" :: ByteString
-    >>> parseOnly requestHeadersParser bs
-    Right (RequestHeaders (fromList [(Connection,"close")]) (fromList [(Accept,"*/*")]) (fromList []) (fromList []))
+    >>> parseTest requestHeadersParser bs
+    Done "" RequestHeaders (fromList [(Connection,"close")]) (fromList [(Accept,"*/*")]) (fromList []) (fromList [])
 -}
 requestHeadersParser :: Parser RequestHeaders
 -- XXX: Support unordered headers
@@ -154,9 +155,9 @@ requestHeadersParser = RequestHeaders <$> headersGeneralParser
     >>> parseTest headersGeneralParser bs
     Done "Accept-Language: en-us\r\n" fromList [(Connection,"close"),(Date,"Sun, 18 Oct 2009 08:56:53 GMT")]
 
-    >>> let bs' = "Connection: close\r\nAccept-Language\r\n" :: ByteString
+    >>> let bs' = "Connection: close\r\n\r\n" :: ByteString
     >>> parseTest headersGeneralParser bs'
-    Done "Accept-Language\r\n" fromList [(Connection,"close")]
+    Done "\r\n" fromList [(Connection,"close")]
 -}
 headersGeneralParser :: Parser (Headers HeaderGeneral)
 headersGeneralParser = headersParser headerGeneralParser
@@ -169,6 +170,8 @@ headersGeneralParser = headersParser headerGeneralParser
     >>> let bs' = "Date: Sun, 18 Oct 2009 08:56:53 GMT\r\n" :: ByteString
     >>> parseTest headerGeneralParser bs'
     Done "" (Date,"Sun, 18 Oct 2009 08:56:53 GMT")
+    >>> parseTest headerGeneralParser "\r\n"
+    Fail "\r\n" [] "Failed reading: empty"
 -}
 headerGeneralParser :: Parser (HeaderGeneral, ByteString)
 headerGeneralParser = headerParser
@@ -211,9 +214,9 @@ headerEntityParser =  headerParser
 
 {-| Parse extension headers of a 'Request'.
 
-    >>> let bs = "SomeHeader: SomeValue\r\nAnotherHeader: AnotherValue\r\n" :: ByteString
-    >>> parseOnly headersExtensionParser bs
-    Right (fromList [("AnotherHeader","AnotherValue"),("SomeHeader","SomeValue")])
+    >>> let bs = "SomeHeader: SomeValue\r\nAnotherHeader: AnotherValue\r\n\r\n" :: ByteString
+    >>> parseTest headersExtensionParser bs
+    Done "\r\n" fromList [("AnotherHeader","AnotherValue"),("SomeHeader","SomeValue")]
 -}
 headersExtensionParser :: Parser (Headers HeaderExtension)
 headersExtensionParser = headersParser headerExtensionParser
@@ -223,12 +226,20 @@ headersExtensionParser = headersParser headerExtensionParser
     >>> let bs = "SomeHeader: SomeValue\r\n" :: ByteString
     >>> parseTest headerExtensionParser bs
     Done "" ("SomeHeader","SomeValue")
+
+    >>> let bs' = "\r\n" :: ByteString
+    >>> parseTest headerExtensionParser bs'
+    Fail "\r\n" [] "Failed reading: empty"
 -}
 headerExtensionParser :: Parser (HeaderExtension, ByteString)
 headerExtensionParser = do
-    field <- takeWhile1 (/= ':') <* char ':'
-    value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
-    return (field, value)
+    w <- peekWord8'
+    if isEndOfLine w
+    then empty
+    else do
+        field <- takeWhile1 (/= ':') <* char ':'
+        value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
+        return (field, value)
 
 -- ** Header helpers
 
@@ -241,11 +252,13 @@ headerParser :: (Show h, Enum h) => Parser (h, ByteString)
 headerParser = asum $ mkHeaderParser <$> enumAll
 
 mkHeaderParser :: Show h => h -> Parser (h, ByteString)
-mkHeaderParser h = stringCI (showBS h)
-                *> char ':'
-                *> skipSpaces
-                *> do bs <- takeTill isEndOfLine <* endOfLine
-                      return (h, bs)
+mkHeaderParser h = do
+    w <- peekWord8'
+    if isEndOfLine w
+    then empty
+    else stringCI (showBS h) *> char ':' *> skipSpaces *> do
+        bs <- takeTill isEndOfLine <* endOfLine
+        return (h, bs)
 
 -- * Common helpers
 

@@ -136,8 +136,9 @@ hostParser = stringCI "host:"
 
 {-| Parser for all headers of a 'Request'.
 
-    >>> -- let bs = "Connection: close\r\nAccept: */*\r\n\r\n :: ByteString
-    >>> -- parseTest requestHeadersParser bs
+    >>> let bs = "Connection: close\r\nAccept: */*\r\n\r\n" :: ByteString
+    >>> parseOnly requestHeadersParser bs
+    Right (RequestHeaders (fromList [(Connection,"close")]) (fromList [(Accept,"*/*")]) (fromList []) (fromList []))
 -}
 requestHeadersParser :: Parser RequestHeaders
 -- XXX: Support unordered headers

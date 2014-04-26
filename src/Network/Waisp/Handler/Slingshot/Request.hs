@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 module Network.Waisp.Handler.Slingshot.Request
   ( requestMessageHeaderParser
   ) where
@@ -40,11 +41,10 @@ import Network.Waisp
   -- , Host
   -- )
 import Network.Waisp.Handler.Slingshot.Utils
-
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import Data.ByteString.Char8
--- >>> import Data.Attoparsec (parseTest, parseOnly)
+-- >>> import Data.Attoparsec (parseTest)
 
 -- * Attoparsec
 
@@ -139,9 +139,9 @@ hostParser = stringCI "host:"
 
 {-| Parser for all headers of a 'Request'.
 
-    >>> let bs = "Connection: close\r\nAccept: */*\r\n\r\n" :: ByteString
+    >>> let bs = "Connection: close\r\nAccept-Language: en-us\r\n\r\n" :: ByteString
     >>> parseTest requestHeadersParser bs
-    Done "" RequestHeaders (fromList [(Connection,"close")]) (fromList [(Accept,"*/*")]) (fromList []) (fromList [])
+    Done "" RequestHeaders (fromList [(Connection,"close")]) (fromList [(Accept-Language,"en-us")]) (fromList []) (fromList [])
 -}
 requestHeadersParser :: Parser RequestHeaders
 -- XXX: Support unordered headers
@@ -169,9 +169,14 @@ headersGeneralParser = headersParser headerGeneralParser
     >>> let bs = "Connection: close\r\n" :: ByteString
     >>> parseTest headerGeneralParser bs
     Done "" (Connection,"close")
+
     >>> let bs' = "Date: Sun, 18 Oct 2009 08:56:53 GMT\r\n" :: ByteString
     >>> parseTest headerGeneralParser bs'
     Done "" (Date,"Sun, 18 Oct 2009 08:56:53 GMT")
+
+    >>> parseTest headerRequestParser "short: i"
+    Fail "short: i" [] "Failed reading: empty"
+
     >>> parseTest headerGeneralParser "\r\n"
     Fail "\r\n" [] "Failed reading: empty"
 -}
@@ -234,11 +239,10 @@ headersExtensionParser = headersParser headerExtensionParser
     Fail "\r\n" [] "Failed reading: empty"
 -}
 headerExtensionParser :: Parser (HeaderExtension, ByteString)
-headerExtensionParser = failWhenEndOfLine *> do
-    field <- takeWhile1 (/= ':') <* char ':'
-    value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
-    return (field, value)
-  where
+headerExtensionParser = failWhenEndOfLine *>
+    ((,) <$> (takeWhile1 (/= ':') <* char ':')
+         <*> (skipSpaces *> takeTill isEndOfLine <* endOfLine))
+
 -- ** Header helpers
 
 headersParser :: (Show h, Ord h)
@@ -250,9 +254,12 @@ headerParser :: (Show h, Enum h) => Parser (h, ByteString)
 headerParser = failWhenEndOfLine *> asum (mkHeaderParser <$> enumAll)
 
 mkHeaderParser :: Show h => h -> Parser (h, ByteString)
-mkHeaderParser h = stringCI (showBS h) *> char ':' *> skipSpaces *> do
-    bs <- takeTill isEndOfLine <* endOfLine
-    return (h, bs)
+mkHeaderParser h = do
+    fbs <- takeWhile1 (/= ':') <* char ':'
+    -- TODO: Ignore uppercase
+    if fbs /= showBS h
+    then empty
+    else skipSpaces *> ((h,) <$> takeTill isEndOfLine <* endOfLine)
 
 -- * Common helpers
 

@@ -14,11 +14,13 @@ import Control.Applicative
   , many
   , empty
   )
+import Control.Monad (when)
 import Data.Foldable (asum)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.Map as Map
 import Data.Attoparsec (satisfy, skipWhile, takeTill, peekWord8')
+import qualified Data.Attoparsec as A(Parser)
 import Data.Attoparsec.Char8
   ( Parser
   , stringCI
@@ -232,15 +234,11 @@ headersExtensionParser = headersParser headerExtensionParser
     Fail "\r\n" [] "Failed reading: empty"
 -}
 headerExtensionParser :: Parser (HeaderExtension, ByteString)
-headerExtensionParser = do
-    w <- peekWord8'
-    if isEndOfLine w
-    then empty
-    else do
-        field <- takeWhile1 (/= ':') <* char ':'
-        value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
-        return (field, value)
-
+headerExtensionParser = failWhenEndOfLine *> do
+    field <- takeWhile1 (/= ':') <* char ':'
+    value <- skipSpaces *> takeTill isEndOfLine <* endOfLine
+    return (field, value)
+  where
 -- ** Header helpers
 
 headersParser :: (Show h, Ord h)
@@ -249,21 +247,22 @@ headersParser :: (Show h, Ord h)
 headersParser = fmap Map.fromList . many
 
 headerParser :: (Show h, Enum h) => Parser (h, ByteString)
-headerParser = asum $ mkHeaderParser <$> enumAll
+headerParser = failWhenEndOfLine *> asum (mkHeaderParser <$> enumAll)
 
 mkHeaderParser :: Show h => h -> Parser (h, ByteString)
-mkHeaderParser h = do
-    w <- peekWord8'
-    if isEndOfLine w
-    then empty
-    else stringCI (showBS h) *> char ':' *> skipSpaces *> do
-        bs <- takeTill isEndOfLine <* endOfLine
-        return (h, bs)
+mkHeaderParser h = stringCI (showBS h) *> char ':' *> skipSpaces *> do
+    bs <- takeTill isEndOfLine <* endOfLine
+    return (h, bs)
 
 -- * Common helpers
 
 skipSpaces :: Parser ()
 skipSpaces = satisfy isHorizontalSpace *> skipWhile isHorizontalSpace
+
+failWhenEndOfLine :: A.Parser ()
+failWhenEndOfLine = do
+    w <- peekWord8'
+    when (isEndOfLine w) empty
 
 enumAll :: Enum a => [a]
 enumAll = enumFrom $ toEnum 0

@@ -20,7 +20,6 @@ import Network.Waisp.Handler.Slingshot.Settings
 import Network.Waisp.Handler.Slingshot.Request
 import Network.Waisp.Handler.Slingshot.Network
 import Network.Waisp.Handler.Slingshot.Utils
-import Debug.Trace
 
 type Port = Int
 

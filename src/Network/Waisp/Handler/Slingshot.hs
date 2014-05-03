@@ -43,7 +43,8 @@ serveSettingsSocket _ sock (Application f) =
 
 recvRequest :: Socket -> IO (Maybe Request)
 recvRequest sock = do
-    (mh, body) <- runStateT (parse requestMessageHeaderParser) (fromSocket sock 4096)
+    (mh, body) <- runStateT (parse requestMessageHeaderParser)
+                            (fromSocket sock 4096)
     case mh of
          Nothing -> return Nothing
          Just eh  -> case eh of
@@ -51,14 +52,16 @@ recvRequest sock = do
                           Right h -> return . Just $ Request h body
 
 sendResponse :: Socket -> Response -> IO ()
-sendResponse sock res =
-    runEffect $ (yield (responseMessageHeader res) *> responseBody res) >-> toSocket sock
+sendResponse sock res = runEffect
+                      $ (yield (responseMessageHeader res) *> responseBody res)
+                    >-> toSocket sock
 
 responseMessageHeader :: Response -> ByteString
 responseMessageHeader (Response statusline headers _) =
     showBS statusline <> showHeaders headers
   where
-    showHeaders (ResponseHeaders h0 h1 h2 h3) = format h0 <> format h1 <> format h2 <> format h3 <> "\r\n"
+    showHeaders (ResponseHeaders h0 h1 h2 h3) =
+        format h0 <> format h1 <> format h2 <> format h3 <> "\r\n"
     format m = foldMap format' $ Map.toList m
     format' (h,f) = showBS h <> ": " <> showBS f <> "\r\n"
 

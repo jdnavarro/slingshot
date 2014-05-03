@@ -34,7 +34,7 @@ import Data.Attoparsec.Char8
   , endOfLine
   , isHorizontalSpace
   )
-import Network.Waisp
+import Network.Waisp.Request
   -- ( RequestMessageHeader(..)
   -- , RequestLine
   -- , RequestHeaders

@@ -2,3 +2,4 @@
 - Support unordered HTTP headers
 - `pipes-safe` for closing socket
 - Proper Unit tests
+- Handle persisente HTTP connections

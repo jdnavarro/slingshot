@@ -15,7 +15,12 @@ import Pipes ((>->), runEffect, yield)
 import Pipes.Network.TCP (acceptFork, fromSocket, toSocket)
 import Pipes.Attoparsec (parse)
 
-import Network.Waisp (Application(..), Request(..), Response(..), ResponseHeaders(..), Body)
+import Network.Waisp
+  ( Application(..)
+  , Request(..)
+  , Response(..)
+  , ResponseHeaders(..)
+  , Body)
 import Network.Waisp.Handler.Slingshot.Settings
 import Network.Waisp.Handler.Slingshot.Request
 import Network.Waisp.Handler.Slingshot.Network

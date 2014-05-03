@@ -35,12 +35,22 @@ import Data.Attoparsec.Char8
   , isHorizontalSpace
   )
 import Network.Waisp.Request
-  -- ( RequestMessageHeader(..)
-  -- , RequestLine
-  -- , RequestHeaders
-  -- , Host
-  -- )
+ ( HttpVersion(..)
+ , Headers
+ , HeaderGeneral
+ , HeaderRequest
+ , HeaderEntity
+ , HeaderExtension
+ , RequestMessageHeader(..)
+ , RequestLine(..)
+ , Method
+ , PathInfo
+ , Query
+ , Host
+ , RequestHeaders(..)
+ )
 import Network.Waisp.Handler.Slingshot.Utils
+
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import Data.ByteString.Char8

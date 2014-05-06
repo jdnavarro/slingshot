@@ -1,7 +1,7 @@
 name:                slingshot
 version:             0.1
 cabal-version:       >=1.10
-tested-with:         GHC == 7.6.3
+tested-with:         GHC == 7.8.2
 build-type:          Simple
 homepage:            https://github.com/jdnavarro/slingshot
 license:             BSD3
@@ -22,11 +22,11 @@ library
                     Network.Waisp.Handler.Slingshot.Request,
                     Network.Waisp.Handler.Slingshot.Settings,
                     Network.Waisp.Handler.Slingshot.Network
-  other-modules:    Network.Waisp.Handler.Slingshot.Utils
+  -- other-modules:    
   hs-source-dirs:   src
   default-language: Haskell2010
   ghc-options:      -Wall
-  build-depends:    base >= 4.6 && < 4.8,
+  build-depends:    base >= 4.6 && < 5,
                     binary,
                     bytestring,
                     transformers,
@@ -38,7 +38,9 @@ library
                     pipes,
                     pipes-network,
                     pipes-attoparsec,
-                    waisp
+                    pipes-bytestring,
+                    waisp,
+                    bytestring-buildable
 
 test-suite doctests
   type:             exitcode-stdio-1.0

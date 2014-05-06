@@ -19,6 +19,7 @@ import Control.Monad (when)
 import Data.Foldable (asum)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import Data.ByteString.Buildable (Buildable, toByteString)
 import qualified Data.Map as Map
 import Data.Attoparsec (satisfy, skipWhile, takeTill, peekWord8')
 import qualified Data.Attoparsec as A(Parser)
@@ -36,7 +37,7 @@ import Data.Attoparsec.Char8
   )
 import Network.Waisp.Request
  ( HttpVersion(..)
- , Headers
+ , Headers(..)
  , HeaderGeneral
  , HeaderRequest
  , HeaderEntity
@@ -49,7 +50,6 @@ import Network.Waisp.Request
  , Host
  , RequestHeaders(..)
  )
-import Network.Waisp.Handler.Slingshot.Utils
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -94,7 +94,7 @@ Done " /docs/index.html" GET
 methodParser :: Parser Method
 methodParser = asum $ meth <$> enumAll
   where
-    meth met = met <$ stringCI (showBS met)
+    meth met = met <$ stringCI (toByteString met)
 
 {-| 'PathInfo' parser.
 
@@ -255,19 +255,19 @@ headerExtensionParser = failWhenEndOfLine *>
 
 -- ** Header helpers
 
-headersParser :: (Show h, Ord h)
+headersParser :: (Buildable h, Ord h)
               => Parser (h, ByteString)
               -> Parser (Headers h)
-headersParser = fmap Map.fromList . many
+headersParser = fmap (Headers . Map.fromList) . many
 
-headerParser :: (Show h, Enum h) => Parser (h, ByteString)
+headerParser :: (Buildable h, Enum h) => Parser (h, ByteString)
 headerParser = failWhenEndOfLine *> asum (mkHeaderParser <$> enumAll)
 
-mkHeaderParser :: Show h => h -> Parser (h, ByteString)
+mkHeaderParser :: Buildable h => h -> Parser (h, ByteString)
 mkHeaderParser h = do
     fbs <- takeWhile1 (/= ':') <* char ':'
     -- TODO: Ignore uppercase
-    if fbs /= showBS h
+    if fbs /= toByteString h
     then empty
     else skipSpaces *> ((h,) <$> takeTill isEndOfLine <* endOfLine)
 
